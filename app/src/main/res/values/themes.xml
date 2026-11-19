@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.WebMirror" parent="Theme.Material3.DayNight.NoActionBar">
+
+        <item name="android:windowBackground">@android:color/black</item>
+
+        <item name="android:windowFullscreen">true</item>
+
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+
+        <item name="android:statusBarColor">@android:color/transparent</item>
+
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+
+    </style>
+
+    <style name="Theme.WebMirror.Splash" parent="Theme.WebMirror">
+        <item name="android:windowDisablePreview">true</item>
+        <item name="android:windowBackground">@drawable/bg_splash_vignette</item>
+    </style>
+
+    <style name="BottomSheetTheme"
+        parent="ThemeOverlay.Material3.BottomSheetDialog">
+
+        <item name="enableEdgeToEdge">true</item>
+
+        <item name="paddingBottomSystemWindowInsets">false</item>
+
+        <item name="paddingLeftSystemWindowInsets">false</item>
+
+        <item name="paddingRightSystemWindowInsets">false</item>
+
+    </style>
+
+    <style name="DialogAnimation">
+        <item name="android:windowEnterAnimation">@anim/dialog_enter</item>
+        <item name="android:windowExitAnimation">@anim/dialog_exit</item>
+    </style>
+
+</resources>
