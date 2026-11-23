@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/dialogRoot"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -8,65 +9,20 @@
     android:background="@drawable/bg_dialog_container"
     android:paddingStart="24dp"
     android:paddingEnd="24dp"
-    android:paddingTop="26dp"
+    android:paddingTop="22dp"
     android:paddingBottom="22dp">
 
-    <FrameLayout
-        android:id="@+id/iconContainer"
-        android:layout_width="56dp"
-        android:layout_height="56dp"
-        android:layout_marginBottom="16dp"
-        android:background="@drawable/bg_update_icon_container">
-
-        <ImageView
-            android:id="@+id/iconUpdate"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:layout_gravity="center"
-            android:src="@drawable/ic_download"
-            android:tint="#38BDF8"
-            android:contentDescription="Update Icon" />
-    </FrameLayout>
-
-    <TextView
-        android:id="@+id/dialogTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Update Available"
-        android:textColor="@android:color/white"
-        android:textSize="19sp"
-        android:textStyle="bold"
-        android:fontFamily="sans-serif-medium"
-        android:gravity="center" />
-
-    <TextView
-        android:id="@+id/tvVersionBadge"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:background="@drawable/bg_version_pill"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
-        android:paddingTop="4dp"
-        android:paddingBottom="4dp"
-        android:text="v4.0 → v4.1"
-        android:textColor="#38BDF8"
-        android:textSize="12sp"
-        android:fontFamily="sans-serif-medium"
-        android:gravity="center" />
-
-    <TextView
-        android:id="@+id/dialogMessage"
+    <!-- Update Image from API with rounded corners -->
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/updateImage"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:layout_marginBottom="24dp"
-        android:text="A new version of NetMirror is available with important improvements and bug fixes. Please update for the best streaming experience."
-        android:textColor="#A1A1AA"
-        android:textSize="13.5sp"
-        android:lineSpacingExtra="3dp"
-        android:gravity="center"
-        android:fontFamily="sans-serif" />
+        android:adjustViewBounds="true"
+        android:scaleType="fitCenter"
+        android:layout_marginBottom="20dp"
+        android:visibility="gone"
+        app:shapeAppearanceOverlay="@style/RoundedCornerImageView"
+        android:contentDescription="Update Image" />
 
     <!-- In-App Download Progress Section -->
     <LinearLayout
@@ -75,7 +31,6 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:visibility="gone"
-        android:layout_marginTop="12dp"
         android:layout_marginBottom="22dp">
 
         <LinearLayout
@@ -100,7 +55,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0%"
-                android:textColor="#38BDF8"
+                android:textColor="#E50914"
                 android:textSize="14sp"
                 android:textStyle="bold"
                 android:fontFamily="sans-serif-medium" />
@@ -128,6 +83,7 @@
     </LinearLayout>
 
     <LinearLayout
+        android:id="@+id/buttonContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal">

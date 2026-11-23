@@ -4,7 +4,7 @@
     "type": "APK",
     "kind": "Directory"
   },
-  "applicationId": "app.netmirror.netmirrornew",
+  "applicationId": "com.netmirror.app",
   "variantName": "release",
   "elements": [
     {

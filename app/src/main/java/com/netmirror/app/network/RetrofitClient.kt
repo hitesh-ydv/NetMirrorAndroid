@@ -88,12 +88,25 @@ object RetrofitClient {
                             null
                         }
 
+                        val updateUrl = decodeBase64Url(body.uu)
+                        val updateImageUrl = decodeBase64Url(body.updateImage?.imageUrl)
+
                         val config = AppConfigData(
                             webviewUrl = webviewUrl,
                             sTape = sTape,
                             stapeUrls = body.u ?: emptyList(),
-                            serverVersion = body.version
+                            serverVersion = body.version,
+                            updateUrl = updateUrl,
+                            updateImageUrl = updateImageUrl,
+                            updateImageHeightRatio = body.updateImage?.heightRatio ?: 0.0,
+                            updateImageWidthRatio = body.updateImage?.widthRatio ?: 1.0,
+                            updateImageMaxHeightDp = body.updateImage?.maxHeightDp ?: 0,
+                            showLaterButton = body.showLaterButton?.equals("true", ignoreCase = true) == true
                         )
+
+                        Log.d("Api_urls", "Update URL: $updateUrl")
+                        Log.d("Api_urls", "Update Image URL: $updateImageUrl")
+                        Log.d("Api_urls", "Show Later Button: ${config.showLaterButton}")
 
                         resolvedBaseUrl = baseUrl
                         resolvedApi = candidateApi
@@ -114,6 +127,19 @@ object RetrofitClient {
         resolvedApi?.let { return@withContext it }
         resolveWorkingConfig()
         return@withContext resolvedApi ?: throw IllegalStateException("No working API endpoint found among candidates")
+    }
+
+    fun decodeBase64Url(raw: String?): String? {
+        if (raw.isNullOrBlank()) return null
+        val trimmed = raw.trim()
+        try {
+            val decoded = String(Base64.decode(trimmed, Base64.DEFAULT)).trim()
+            if (decoded.startsWith("http://") || decoded.startsWith("https://")) {
+                return decoded
+            }
+        } catch (_: Exception) {
+        }
+        return trimmed
     }
 
     fun currentBaseUrl(): String? = resolvedBaseUrl

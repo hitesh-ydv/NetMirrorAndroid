@@ -4,8 +4,7 @@ import retrofit2.Response
 import retrofit2.http.GET
 import retrofit2.http.Headers
 
-const val APP_VERSION = "4.0"
-const val UPDATE_APK_URL = "https://kjdrbruhhgilcropmvxh.supabase.co/storage/v1/object/public/unitrack/test/app-release.apk"
+const val APP_VERSION = "3.0"
 
 interface ApiService {
 

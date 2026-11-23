@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.media.AudioManager
 import android.net.Uri
@@ -29,6 +30,8 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import android.widget.ImageView
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -43,14 +46,13 @@ import com.netmirror.app.controls.IosSliderView
 import com.netmirror.app.databinding.ActivityWebviewBinding
 import com.netmirror.app.network.APP_VERSION
 import com.netmirror.app.network.RetrofitClient
-import com.netmirror.app.network.UPDATE_APK_URL
 import com.netmirror.app.utils.CustomToast
 import com.netmirror.app.utils.FullScreenUtil
 import com.netmirror.app.utils.showCustomErrorToast
 import com.netmirror.app.utils.showCustomToast
 import android.os.Build
 import android.os.Environment
-import android.widget.ProgressBar
+import android.view.ViewGroup
 import androidx.core.content.FileProvider
 import java.io.File
 import java.io.FileOutputStream
@@ -103,6 +105,12 @@ class WebViewActivity : AppCompatActivity() {
     private var hasCheckedUpdate = false
     private var updateDownloadJob: Job? = null
     private var downloadedApkFile: File? = null
+    private var updateApkUrl: String? = null
+    private var updateImageUrl: String? = null
+    private var updateImageHeightRatio: Double = 0.0
+    private var updateImageWidthRatio: Double = 1.0
+    private var updateImageMaxHeightDp: Int = 0
+    private var showLaterButton: Boolean = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -112,6 +120,28 @@ class WebViewActivity : AppCompatActivity() {
 
         sTape = intent.getStringExtra("sTape")
         stapeUrls = intent.getStringArrayListExtra("stapeUrls") ?: emptyList()
+        updateApkUrl = RetrofitClient.decodeBase64Url(
+            intent.getStringExtra("updateUrl") ?: RetrofitClient.currentConfig()?.updateUrl
+        )
+        updateImageUrl = RetrofitClient.decodeBase64Url(
+            intent.getStringExtra("updateImageUrl") ?: RetrofitClient.currentConfig()?.updateImageUrl
+        )
+        updateImageHeightRatio = intent.getDoubleExtra(
+            "updateImageHeightRatio",
+            RetrofitClient.currentConfig()?.updateImageHeightRatio ?: 0.0
+        )
+        updateImageWidthRatio = intent.getDoubleExtra(
+            "updateImageWidthRatio",
+            RetrofitClient.currentConfig()?.updateImageWidthRatio ?: 1.0
+        )
+        updateImageMaxHeightDp = intent.getIntExtra(
+            "updateImageMaxHeightDp",
+            RetrofitClient.currentConfig()?.updateImageMaxHeightDp ?: 0
+        )
+        showLaterButton = intent.getBooleanExtra(
+            "showLaterButton",
+            RetrofitClient.currentConfig()?.showLaterButton ?: true
+        )
 
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         volumeControlStream = AudioManager.STREAM_MUSIC
@@ -1022,7 +1052,7 @@ class WebViewActivity : AppCompatActivity() {
         val serverVersion = (intent.getStringExtra("serverVersion")
             ?: RetrofitClient.currentConfig()?.serverVersion)?.trim()
 
-        if (!serverVersion.isNullOrBlank() && serverVersion != APP_VERSION.trim()) {
+        if (!serverVersion.isNullOrBlank() && serverVersion != APP_VERSION.trim() && !updateApkUrl.isNullOrBlank()) {
             binding.root.postDelayed({
                 if (!isFinishing && !isDestroyed) {
                     showUpdateDialog(serverVersion)
@@ -1035,17 +1065,18 @@ class WebViewActivity : AppCompatActivity() {
         val dialog = android.app.Dialog(this)
         dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
         dialog.setContentView(R.layout.dialog_app_update)
-        dialog.setCanceledOnTouchOutside(false)
+        dialog.setCanceledOnTouchOutside(showLaterButton)
+        dialog.setCancelable(showLaterButton)
         dialog.window?.let { window ->
             window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
             window.setWindowAnimations(R.style.DialogAnimation)
-            val width = (resources.displayMetrics.widthPixels * 0.88).toInt().coerceAtMost(dpToPx(380))
+            // Dialog width = screen width * API ratio (e.g. 0.5 = 50%). Falls back to 88% if not given.
+            val dialogWidthRatio = normalizeRatio(updateImageWidthRatio, 0.88f).coerceIn(0.3f, 1.0f)
+            val width = (resources.displayMetrics.widthPixels * dialogWidthRatio).toInt()
             window.setLayout(width, android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
         }
 
-        val iconContainer = dialog.findViewById<View>(R.id.iconContainer)
-        val tvBadge = dialog.findViewById<TextView>(R.id.tvVersionBadge)
-        val dialogMessage = dialog.findViewById<TextView>(R.id.dialogMessage)
+        val updateImageView = dialog.findViewById<ImageView>(R.id.updateImage)
         val progressSection = dialog.findViewById<View>(R.id.progressSection)
         val tvProgressStatus = dialog.findViewById<TextView>(R.id.tvProgressStatus)
         val tvProgressPercent = dialog.findViewById<TextView>(R.id.tvProgressPercent)
@@ -1054,20 +1085,75 @@ class WebViewActivity : AppCompatActivity() {
         val btnCancel = dialog.findViewById<TextView>(R.id.btnCancel)
         val btnUpdate = dialog.findViewById<TextView>(R.id.btnUpdate)
         val tvBottomMessage = dialog.findViewById<TextView>(R.id.tvBottomMessage)
+        val buttonContainer = dialog.findViewById<View>(R.id.buttonContainer)
 
-        tvBadge?.text = "Current: v$APP_VERSION  →  Latest: v$serverVersion"
+        // Show/hide Later button based on API flag
+        if (showLaterButton) {
+            btnCancel?.visibility = View.VISIBLE
+        } else {
+            btnCancel?.visibility = View.GONE
+            // Remove start margin from Update button when Later is hidden
+            val updateParams = btnUpdate?.layoutParams as? android.widget.LinearLayout.LayoutParams
+            updateParams?.marginStart = 0
+            btnUpdate?.layoutParams = updateParams
+        }
 
-        // Smooth spring pop animation for the update icon container
-        iconContainer?.scaleX = 0.4f
-        iconContainer?.scaleY = 0.4f
-        iconContainer?.alpha = 0f
-        iconContainer?.animate()
-            ?.scaleX(1.0f)
-            ?.scaleY(1.0f)
-            ?.alpha(1.0f)
-            ?.setDuration(450)
-            ?.setInterpolator(OvershootInterpolator(2.2f))
-            ?.start()
+
+
+        // Load update image from API
+        if (!updateImageUrl.isNullOrBlank()) {
+
+            // Image height = screen height * API ratio (e.g. 0.5 = 50%).
+            // Set BEFORE the image loads so the dialog size is final and does not jump.
+            val heightRatio = normalizeRatio(updateImageHeightRatio, 0f)
+            val screenHeight = resources.displayMetrics.heightPixels
+
+            updateImageView?.apply {
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                visibility = View.VISIBLE
+                if (heightRatio > 0f) {
+                    adjustViewBounds = false
+                    layoutParams = layoutParams.apply {
+                        width = ViewGroup.LayoutParams.MATCH_PARENT
+                        height = (screenHeight * heightRatio.coerceAtMost(0.8f)).toInt()
+                    }
+                } else {
+                    // No height ratio from API -> wrap image, optional dp cap
+                    adjustViewBounds = true
+                    maxHeight = if (updateImageMaxHeightDp > 0) dpToPx(updateImageMaxHeightDp) else Int.MAX_VALUE
+                }
+            }
+
+            lifecycleScope.launch(Dispatchers.IO) {
+                try {
+                    val imgClient = OkHttpClient.Builder()
+                        .connectTimeout(15, TimeUnit.SECONDS)
+                        .readTimeout(20, TimeUnit.SECONDS)
+                        .followRedirects(true)
+                        .followSslRedirects(true)
+                        .build()
+
+                    val imgRequest = Request.Builder()
+                        .url(updateImageUrl!!)
+                        .build()
+
+                    imgClient.newCall(imgRequest).execute().use { response ->
+                        if (response.isSuccessful) {
+                            val bitmap = response.body?.byteStream()?.let { BitmapFactory.decodeStream(it) }
+                            if (bitmap != null) {
+                                withContext(Dispatchers.Main) {
+                                    if (!isFinishing && !isDestroyed && dialog.isShowing) {
+                                        updateImageView?.setImageBitmap(bitmap)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("AppUpdate", "Failed to load update image: $e")
+                }
+            }
+        }
 
         val downloadDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: cacheDir
         val apkFile = File(downloadDir, "netmirror_update.apk")
@@ -1077,7 +1163,10 @@ class WebViewActivity : AppCompatActivity() {
                 apkFile.delete()
             }
 
-            dialogMessage?.visibility = View.GONE
+            // Keep update image visible while downloading
+            if (!updateImageUrl.isNullOrBlank()) {
+                updateImageView?.visibility = View.VISIBLE
+            }
             progressSection?.visibility = View.VISIBLE
             btnUpdate?.visibility = View.GONE
             btnCancel?.text = "Cancel"
@@ -1098,7 +1187,7 @@ class WebViewActivity : AppCompatActivity() {
                         .build()
 
                     val request = Request.Builder()
-                        .url(UPDATE_APK_URL)
+                        .url(updateApkUrl!!)
                         .build()
 
                     val response = client.newCall(request).execute()
@@ -1348,6 +1437,13 @@ class WebViewActivity : AppCompatActivity() {
             showLoader()
             binding.webView.reload()
         }
+    }
+
+    /** Accepts 0.5 or 50 (percent) and returns a 0..1 fraction. <=0 returns [default]. */
+    private fun normalizeRatio(value: Double, default: Float): Float {
+        if (value <= 0.0) return default
+        val v = if (value > 1.0) value / 100.0 else value
+        return v.toFloat().coerceIn(0f, 1f)
     }
 
     private fun dpToPx(dp: Int): Int {

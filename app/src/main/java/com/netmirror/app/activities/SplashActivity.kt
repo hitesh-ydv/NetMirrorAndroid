@@ -414,6 +414,12 @@ class SplashActivity : AppCompatActivity() {
                         config.sTape?.let { putExtra("sTape", it) }
                         putStringArrayListExtra("stapeUrls", ArrayList(config.stapeUrls))
                         config.serverVersion?.let { putExtra("serverVersion", it) }
+                        config.updateUrl?.let { putExtra("updateUrl", it) }
+                        config.updateImageUrl?.let { putExtra("updateImageUrl", it) }
+                        putExtra("updateImageHeightRatio", config.updateImageHeightRatio)
+                        putExtra("updateImageWidthRatio", config.updateImageWidthRatio)
+                        putExtra("updateImageMaxHeightDp", config.updateImageMaxHeightDp)
+                        putExtra("showLaterButton", config.showLaterButton)
                     }
 
                     startActivity(intent)
