@@ -1076,6 +1076,7 @@ class WebViewActivity : AppCompatActivity() {
             window.setLayout(width, android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
         }
 
+        val updateImageCard = dialog.findViewById<View>(R.id.updateImageCard)
         val updateImageView = dialog.findViewById<ImageView>(R.id.updateImage)
         val progressSection = dialog.findViewById<View>(R.id.progressSection)
         val tvProgressStatus = dialog.findViewById<TextView>(R.id.tvProgressStatus)
@@ -1108,9 +1109,9 @@ class WebViewActivity : AppCompatActivity() {
             val heightRatio = normalizeRatio(updateImageHeightRatio, 0f)
             val screenHeight = resources.displayMetrics.heightPixels
 
+            updateImageCard?.visibility = View.VISIBLE
             updateImageView?.apply {
                 scaleType = ImageView.ScaleType.FIT_CENTER
-                visibility = View.VISIBLE
                 if (heightRatio > 0f) {
                     adjustViewBounds = false
                     layoutParams = layoutParams.apply {
@@ -1165,6 +1166,7 @@ class WebViewActivity : AppCompatActivity() {
 
             // Keep update image visible while downloading
             if (!updateImageUrl.isNullOrBlank()) {
+                updateImageCard?.visibility = View.VISIBLE
                 updateImageView?.visibility = View.VISIBLE
             }
             progressSection?.visibility = View.VISIBLE

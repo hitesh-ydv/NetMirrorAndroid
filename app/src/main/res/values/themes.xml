@@ -39,8 +39,4 @@
         <item name="android:windowExitAnimation">@anim/dialog_exit</item>
     </style>
 
-    <style name="RoundedCornerImageView">
-        <item name="cornerSize">50dp</item>
-    </style>
-
 </resources>

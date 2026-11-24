@@ -114,6 +114,8 @@
         android:elevation="20dp"
         app:cardBackgroundColor="#1C1C1E"
         app:cardCornerRadius="28dp"
+        app:strokeColor="#9B0000"
+        app:strokeWidth="2dp"
         app:layout_constraintWidth_percent="0.90"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
@@ -364,17 +366,6 @@
 
             </LinearLayout>
 
-            <!-- App Version -->
-            <TextView
-                android:id="@+id/tvAppVersion"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginTop="20dp"
-                android:text="Version 3.0"
-                android:textColor="#80FFFFFF"
-                android:textSize="11sp"
-                android:fontFamily="sans-serif-medium" />
 
         </LinearLayout>
 
