@@ -10,12 +10,11 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.netmirror.app"
+        applicationId = "app.netmirror.testv40"
         minSdk = 21
         targetSdk = 36
         versionCode = 4
         versionName = "4.0"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

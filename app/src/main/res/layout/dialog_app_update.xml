@@ -12,27 +12,24 @@
     android:paddingTop="22dp"
     android:paddingBottom="22dp">
 
-    <!-- Update Image with rounded corners via MaterialCardView -->
-    <com.google.android.material.card.MaterialCardView
+    <!-- Update Image with rounded corners -->
+    <FrameLayout
         android:id="@+id/updateImageCard"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="20dp"
-        android:visibility="gone"
-        app:cardCornerRadius="16dp"
-        app:cardElevation="0dp"
-        app:strokeWidth="0dp"
-        app:cardBackgroundColor="@android:color/transparent">
+        android:visibility="gone">
 
-        <ImageView
+        <com.google.android.material.imageview.ShapeableImageView
             android:id="@+id/updateImage"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:adjustViewBounds="true"
             android:scaleType="fitCenter"
-            android:contentDescription="Update Image" />
+            android:contentDescription="Update Image"
+            app:shapeAppearanceOverlay="@style/UpdateImageRoundedCorners" />
 
-    </com.google.android.material.card.MaterialCardView>
+    </FrameLayout>
 
     <!-- In-App Download Progress Section -->
     <LinearLayout

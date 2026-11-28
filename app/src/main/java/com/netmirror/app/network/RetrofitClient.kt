@@ -66,14 +66,15 @@ object RetrofitClient {
             }
 
             val normalizedBase = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
-            val fullUrl = "${normalizedBase}check-ver.php?ver=$APP_VERSION"
+            val endpoint = checkVerEndpoint()
+            val fullUrl = "$normalizedBase$endpoint"
             Log.d("Api_urls", "BASE URL: $baseUrl")
             Log.d("Api_urls", "Full URL: $fullUrl")
 
             val candidateApi = buildApi(baseUrl)
 
             try {
-                val response = candidateApi.getUrl()
+                val response = candidateApi.getUrl(endpoint)
                 if (response.isSuccessful) {
                     val body = response.body()
                     val token = body?.token_hash
@@ -100,7 +101,7 @@ object RetrofitClient {
                             updateImageUrl = updateImageUrl,
                             updateImageHeightRatio = body.updateImage?.heightRatio ?: 0.0,
                             updateImageWidthRatio = body.updateImage?.widthRatio ?: 1.0,
-                            updateImageMaxHeightDp = body.updateImage?.maxHeightDp ?: 0,
+//                            updateImageMaxHeightDp = body.updateImage?.maxHeightDp ?: 0,
                             showLaterButton = body.showLaterButton?.equals("true", ignoreCase = true) == true
                         )
 

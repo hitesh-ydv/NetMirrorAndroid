@@ -7,7 +7,6 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.media.AudioManager
 import android.net.Uri
@@ -31,7 +30,6 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.ImageView
-import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -40,7 +38,6 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import android.util.Base64
 import android.util.Log
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.snackbar.Snackbar
 import com.netmirror.app.R
 import com.netmirror.app.controls.IosSliderView
 import com.netmirror.app.databinding.ActivityWebviewBinding
@@ -50,13 +47,7 @@ import com.netmirror.app.utils.CustomToast
 import com.netmirror.app.utils.FullScreenUtil
 import com.netmirror.app.utils.showCustomErrorToast
 import com.netmirror.app.utils.showCustomToast
-import android.os.Build
-import android.os.Environment
 import android.view.ViewGroup
-import androidx.core.content.FileProvider
-import java.io.File
-import java.io.FileOutputStream
-import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -103,8 +94,6 @@ class WebViewActivity : AppCompatActivity() {
     private var spinnerAnimator: ValueAnimator? = null
     private var isHidingLoader = false
     private var hasCheckedUpdate = false
-    private var updateDownloadJob: Job? = null
-    private var downloadedApkFile: File? = null
     private var updateApkUrl: String? = null
     private var updateImageUrl: String? = null
     private var updateImageHeightRatio: Double = 0.0
@@ -117,6 +106,10 @@ class WebViewActivity : AppCompatActivity() {
 
         binding = ActivityWebviewBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        if (savedInstanceState != null) {
+            hasCheckedUpdate = savedInstanceState.getBoolean("state_has_checked_update", false)
+        }
 
         sTape = intent.getStringExtra("sTape")
         stapeUrls = intent.getStringArrayListExtra("stapeUrls") ?: emptyList()
@@ -158,11 +151,20 @@ class WebViewActivity : AppCompatActivity() {
         setupWebView()
         setupBackNavigation()
 
-        val url = intent.getStringExtra("url") ?: ""
-        if (url.isNotEmpty()) {
-            val headers = hashMapOf("User-Agent" to binding.webView.settings.userAgentString)
-            binding.webView.loadUrl(url, headers)
+        val restored = savedInstanceState?.let { binding.webView.restoreState(it) } != null
+        if (!restored) {
+            val url = intent.getStringExtra("url") ?: ""
+            if (url.isNotEmpty()) {
+                val headers = hashMapOf("User-Agent" to binding.webView.settings.userAgentString)
+                binding.webView.loadUrl(url, headers)
+            }
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        binding.webView.saveState(outState)
+        outState.putBoolean("state_has_checked_update", hasCheckedUpdate)
     }
 
     private fun startLoaderAnimation() {
@@ -1069,6 +1071,7 @@ class WebViewActivity : AppCompatActivity() {
         dialog.setCancelable(showLaterButton)
         dialog.window?.let { window ->
             window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+            window.setDimAmount(0.85f)
             window.setWindowAnimations(R.style.DialogAnimation)
             // Dialog width = screen width * API ratio (e.g. 0.5 = 50%). Falls back to 88% if not given.
             val dialogWidthRatio = normalizeRatio(updateImageWidthRatio, 0.88f).coerceIn(0.3f, 1.0f)
@@ -1077,16 +1080,15 @@ class WebViewActivity : AppCompatActivity() {
         }
 
         val updateImageCard = dialog.findViewById<View>(R.id.updateImageCard)
-        val updateImageView = dialog.findViewById<ImageView>(R.id.updateImage)
+        val updateImageView = dialog.findViewById<com.google.android.material.imageview.ShapeableImageView>(R.id.updateImage)
         val progressSection = dialog.findViewById<View>(R.id.progressSection)
-        val tvProgressStatus = dialog.findViewById<TextView>(R.id.tvProgressStatus)
-        val tvProgressPercent = dialog.findViewById<TextView>(R.id.tvProgressPercent)
-        val updateProgressBar = dialog.findViewById<ProgressBar>(R.id.updateProgressBar)
-        val tvProgressSize = dialog.findViewById<TextView>(R.id.tvProgressSize)
         val btnCancel = dialog.findViewById<TextView>(R.id.btnCancel)
         val btnUpdate = dialog.findViewById<TextView>(R.id.btnUpdate)
         val tvBottomMessage = dialog.findViewById<TextView>(R.id.tvBottomMessage)
-        val buttonContainer = dialog.findViewById<View>(R.id.buttonContainer)
+
+        // Hide progress section — no in-app download anymore
+        progressSection?.visibility = View.GONE
+        tvBottomMessage?.visibility = View.GONE
 
         // Show/hide Later button based on API flag
         if (showLaterButton) {
@@ -1098,8 +1100,6 @@ class WebViewActivity : AppCompatActivity() {
             updateParams?.marginStart = 0
             btnUpdate?.layoutParams = updateParams
         }
-
-
 
         // Load update image from API
         if (!updateImageUrl.isNullOrBlank()) {
@@ -1140,7 +1140,7 @@ class WebViewActivity : AppCompatActivity() {
 
                     imgClient.newCall(imgRequest).execute().use { response ->
                         if (response.isSuccessful) {
-                            val bitmap = response.body?.byteStream()?.let { BitmapFactory.decodeStream(it) }
+                            val bitmap = response.body?.byteStream()?.let { android.graphics.BitmapFactory.decodeStream(it) }
                             if (bitmap != null) {
                                 withContext(Dispatchers.Main) {
                                     if (!isFinishing && !isDestroyed && dialog.isShowing) {
@@ -1156,193 +1156,28 @@ class WebViewActivity : AppCompatActivity() {
             }
         }
 
-        val downloadDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: cacheDir
-        val apkFile = File(downloadDir, "netmirror_update.apk")
-
-        fun startApkDownload() {
-            if (apkFile.exists()) {
-                apkFile.delete()
-            }
-
-            // Keep update image visible while downloading
-            if (!updateImageUrl.isNullOrBlank()) {
-                updateImageCard?.visibility = View.VISIBLE
-                updateImageView?.visibility = View.VISIBLE
-            }
-            progressSection?.visibility = View.VISIBLE
-            btnUpdate?.visibility = View.GONE
-            btnCancel?.text = "Cancel"
-            tvProgressPercent?.text = "0%"
-            updateProgressBar?.progress = 0
-            tvProgressStatus?.text = "Connecting..."
-            tvProgressSize?.text = "0.0 MB / 0.0 MB"
-            tvBottomMessage?.visibility = View.GONE
-
-            updateDownloadJob?.cancel()
-            updateDownloadJob = lifecycleScope.launch(Dispatchers.IO) {
-                try {
-                    val client = OkHttpClient.Builder()
-                        .connectTimeout(30, TimeUnit.SECONDS)
-                        .readTimeout(60, TimeUnit.SECONDS)
-                        .followRedirects(true)
-                        .followSslRedirects(true)
-                        .build()
-
-                    val request = Request.Builder()
-                        .url(updateApkUrl!!)
-                        .build()
-
-                    val response = client.newCall(request).execute()
-                    if (!response.isSuccessful) {
-                        throw IOException("HTTP ${response.code}")
-                    }
-
-                    val body = response.body ?: throw IOException("Empty response")
-                    val contentLength = body.contentLength()
-                    val totalMb = if (contentLength > 0) contentLength / (1024f * 1024f) else 0f
-
-                    val inputStream = body.byteStream()
-                    val outputStream = FileOutputStream(apkFile)
-
-                    val buffer = ByteArray(8192)
-                    var bytesRead: Int
-                    var totalBytesRead = 0L
-                    var lastUpdateMs = 0L
-
-                    withContext(Dispatchers.Main) {
-                        tvProgressStatus?.text = "Downloading update..."
-                    }
-
-                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                        outputStream.write(buffer, 0, bytesRead)
-                        totalBytesRead += bytesRead
-
-                        val now = System.currentTimeMillis()
-                        if (now - lastUpdateMs > 50 || totalBytesRead == contentLength) {
-                            lastUpdateMs = now
-                            val progress = if (contentLength > 0) {
-                                ((totalBytesRead * 100) / contentLength).toInt().coerceIn(0, 100)
-                            } else 0
-                            val downloadedMb = totalBytesRead / (1024f * 1024f)
-
-                            withContext(Dispatchers.Main) {
-                                updateProgressBar?.progress = progress
-                                tvProgressPercent?.text = "$progress%"
-                                if (contentLength > 0) {
-                                    tvProgressSize?.text = String.format("%.1f MB / %.1f MB", downloadedMb, totalMb)
-                                } else {
-                                    tvProgressSize?.text = String.format("%.1f MB", downloadedMb)
-                                }
-                            }
-                        }
-                    }
-
-                    outputStream.flush()
-                    outputStream.close()
-                    inputStream.close()
-
-                    downloadedApkFile = apkFile
-
-                    withContext(Dispatchers.Main) {
-                        tvProgressStatus?.text = "Download complete!"
-                        tvProgressPercent?.text = "100%"
-                        updateProgressBar?.progress = 100
-                        btnUpdate?.text = "Install Now"
-                        btnUpdate?.visibility = View.VISIBLE
-                        btnCancel?.text = "Close"
-
-                        installApk(apkFile, tvBottomMessage)
-                    }
-                } catch (e: Exception) {
-                    if (e is kotlinx.coroutines.CancellationException) {
-                        apkFile.delete()
-                        return@launch
-                    }
-                    withContext(Dispatchers.Main) {
-                        tvProgressStatus?.text = "Download failed"
-                        btnUpdate?.text = "Retry"
-                        btnUpdate?.visibility = View.VISIBLE
-                        btnCancel?.text = "Cancel"
-                        showCustomErrorToast("Download Error", e.localizedMessage ?: "Failed to download update", CustomToast.LENGTH_SHORT)
-                    }
-                }
-            }
-        }
-
         btnCancel?.setOnClickListener {
-            if (updateDownloadJob?.isActive == true) {
-                updateDownloadJob?.cancel()
-                if (apkFile.exists()) {
-                    apkFile.delete()
-                }
-            }
             dialog.dismiss()
         }
 
+        // Update button: open the update URL in the browser
         btnUpdate?.setOnClickListener {
-            if (downloadedApkFile != null && downloadedApkFile?.exists() == true) {
-                installApk(downloadedApkFile!!, tvBottomMessage)
-            } else {
-                startApkDownload()
+            if (!updateApkUrl.isNullOrBlank()) {
+                try {
+                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(updateApkUrl))
+                    startActivity(browserIntent)
+                } catch (e: Exception) {
+                    Log.e("AppUpdate", "Failed to open browser: $e", e)
+                    showCustomErrorToast("Update Error", "Could not open browser", CustomToast.LENGTH_SHORT)
+                }
             }
         }
 
         dialog.setOnDismissListener {
-            if (updateDownloadJob?.isActive == true) {
-                updateDownloadJob?.cancel()
-                if (apkFile.exists()) {
-                    apkFile.delete()
-                }
-            }
             FullScreenUtil.reApply(this)
         }
 
         FullScreenUtil.showImmersive(dialog)
-    }
-
-    private fun installApk(apkFile: File, tvBottomMessage: TextView? = null) {
-        if (!apkFile.exists()) {
-            showCustomErrorToast("Install Error", "Update file not found", CustomToast.LENGTH_SHORT)
-            return
-        }
-
-        try {
-            val apkUri: Uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                FileProvider.getUriForFile(
-                    this,
-                    "${applicationContext.packageName}.fileprovider",
-                    apkFile
-                )
-            } else {
-                Uri.fromFile(apkFile)
-            }
-
-            val installIntent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(apkUri, "application/vnd.android.package-archive")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                if (!packageManager.canRequestPackageInstalls()) {
-                    val allowIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                        data = Uri.parse("package:$packageName")
-                    }
-                    startActivity(allowIntent)
-                    tvBottomMessage?.let { msgView ->
-                        msgView.text = "Please allow unknown app installation, then tap Install Now"
-                        msgView.visibility = View.VISIBLE
-                    }
-                    return
-                }
-            }
-
-            tvBottomMessage?.visibility = View.GONE
-            startActivity(installIntent)
-        } catch (e: Exception) {
-            Log.e("AppUpdate", "Error installing APK: $e", e)
-            showCustomErrorToast("Install Error", "Failed to launch installer: ${e.message}", CustomToast.LENGTH_SHORT)
-        }
     }
 
     private fun showRemoveCookiesConfirmationDialog() {
@@ -1351,6 +1186,7 @@ class WebViewActivity : AppCompatActivity() {
         dialog.setContentView(R.layout.dialog_confirm_clear_data)
         dialog.window?.let { window ->
             window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+            window.setDimAmount(0.85f)
             window.setWindowAnimations(R.style.DialogAnimation)
             val width = (resources.displayMetrics.widthPixels * 0.88).toInt().coerceAtMost(dpToPx(380))
             window.setLayout(width, android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
